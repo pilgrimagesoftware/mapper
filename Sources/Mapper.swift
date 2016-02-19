@@ -17,61 +17,6 @@ public struct Mapper {
         self.JSON = JSON
     }
 
-    // MARK: - T
-
-    /**
-     Get a typed value from the given field in the source data
-
-     - parameter field: The field to retrieve from the source data, can be an empty string to return the
-                        entire data set
-
-     - throws: MapperError.MissingFieldError if the field doesn't exist
-     - throws: MapperError.TypeMismatchError if the value exists with the incorrect type
-
-     - returns: The value for the given field, if it can be converted to the expected type T
-     */
-    @warn_unused_result
-    public func from<T>(field: String) throws -> T {
-        let value = try self.JSONFromField(field)
-        if let value = value as? T {
-            return value
-        }
-
-        throw MapperError.TypeMismatchError(field: field, value: value, type: T.self)
-    }
-
-    /**
-     Get an optional typed value from the given field in the source data
-
-     - parameter field: The field to retrieve from the source data, can be an empty string to return the
-                        entire data set
-
-     - returns: The value for the given field, if it can be converted to the expected type T otherwise nil
-     */
-    @warn_unused_result
-    public func optionalFrom<T>(field: String) -> T? {
-        return try? self.from(field)
-    }
-
-    /**
-     Get an optional value from the given fields and source data. This returns the first non-nil value
-     produced in order based on the array of fields
-
-     - parameter fields: The array of fields to check from the source data.
-
-     - returns: The first non-nil value to be produced from the array of fields, or nil if none exist
-    */
-    @warn_unused_result
-    public func optionalFrom<T>(fields: [String]) -> T? {
-        for field in fields {
-            if let value: T = try? self.from(field) {
-                return value
-            }
-        }
-
-        return nil
-    }
-
     // MARK: - T: RawRepresentable
 
     /**
@@ -309,6 +254,30 @@ public struct Mapper {
      */
     @warn_unused_result
     public func optionalFrom<T: Convertible where T == T.ConvertedType>(field: String) -> [T]? {
+        return try? self.from(field)
+    }
+
+    @warn_unused_result
+    public func from<U: Convertible, T: Convertible
+        where U == U.ConvertedType, T == T.ConvertedType>(field: String) throws -> [U: T]
+    {
+        let object = try self.JSONFromField(field)
+        guard let data = object as? NSDictionary else {
+            throw MapperError.TypeMismatchError(field: field, value: object, type: NSDictionary.self)
+        }
+
+        var result = [U: T]()
+        for (key, value) in data {
+            result[try U.fromMap(key)] = try T.fromMap(value)
+        }
+
+        return result
+    }
+
+    @warn_unused_result
+    public func optionalFrom<U: Convertible, T: Convertible
+        where U == U.ConvertedType, T == T.ConvertedType>(field: String) -> [U: T]?
+    {
         return try? self.from(field)
     }
 
